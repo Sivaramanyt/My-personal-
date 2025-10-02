@@ -42,11 +42,12 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 logger = logging.getLogger(__name__)
 
 class HealthServer:
-    """Simple HTTP server for health checks"""
+    """Simple HTTP server for health checks without signal handlers"""
     def __init__(self, port=8000):
         self.port = port
         self.app = web.Application()
         self.setup_routes()
+        self.runner = None
         
     def setup_routes(self):
         """Setup health check routes"""
@@ -58,10 +59,25 @@ class HealthServer:
         return web.Response(text="OK", status=200)
     
     def start(self):
-        """Start the health server in a separate thread"""
+        """Start the health server in a separate thread without signal handlers"""
         def run_server():
             try:
-                web.run_app(self.app, host='0.0.0.0', port=self.port, access_log=None, print=None)
+                # Create a new event loop for this thread
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                # Create runner manually to avoid signal handlers
+                self.runner = web.AppRunner(self.app)
+                loop.run_until_complete(self.runner.setup())
+                
+                site = web.TCPSite(self.runner, '0.0.0.0', self.port)
+                loop.run_until_complete(site.start())
+                
+                print(f"✅ Health check server started on port {self.port}")
+                
+                # Run the loop forever without signal handling
+                loop.run_forever()
+                
             except Exception as e:
                 print(f"❌ Health server error: {e}")
         
@@ -69,7 +85,6 @@ class HealthServer:
         server_thread = threading.Thread(target=run_server)
         server_thread.daemon = True
         server_thread.start()
-        print(f"✅ Health check server started on port {self.port}")
 
 class TeraBoxLeechBot:
     def __init__(self):
