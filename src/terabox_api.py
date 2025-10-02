@@ -25,11 +25,12 @@ class TeraBoxAPI:
             data = response.json()
             
             # Debug: Print the actual API response structure
-            print(f"🔍 DEBUG: API Response: {data}")
+            print(f"🔍 DEBUG: Full API Response: {data}")
             
-            # Parse the actual API response structure
-            if "✅ Status" in data and data["✅ Status"] == "Success":
-                extracted_info = data["📚 Extracted Info"][0]  # Get first file info
+            # Parse the actual API response structure with emoji keys
+            if data.get("✅ Status") == "Success":
+                # Access the first file in the "📚 Extracted Info" list
+                extracted_info = data["📚 Extracted Info"][0]
                 
                 filename = extracted_info.get("📁 Title", "Unnamed_File")
                 size_str = extracted_info.get("📊 Size", "0 MB")
