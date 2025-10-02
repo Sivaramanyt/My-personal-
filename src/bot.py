@@ -2,11 +2,10 @@ import sys
 import os
 import logging
 import asyncio
-import time
 from aiohttp import web
 import threading
 
-# Add the project root directory to Python path
+# DEBUG: Add the project root directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
@@ -120,19 +119,19 @@ class TeraBoxLeechBot:
         self.app.add_error_handler(self.error_handler)
     
     async def safe_polling(self):
-        """Start polling with conflict handling and retries :cite[10]."""
+        """Start polling with conflict handling and retries."""
         max_retries = 5
         retry_delay = 2  # seconds
 
         for attempt in range(max_retries):
             try:
-                # Clear any existing webhook first to prevent conflicts :cite[6]:cite[10]
+                # Clear any existing webhook first
                 await self.app.bot.delete_webhook(drop_pending_updates=True)
                 print("✅ Webhook deleted, starting polling...")
                 
-                # Start polling
+                # Start polling - this will run until stopped
                 await self.app.run_polling()
-                break  # Exit loop if polling starts successfully
+                break  # Exit loop if polling completes successfully
 
             except Exception as e:
                 if "Conflict" in str(e):
@@ -144,134 +143,35 @@ class TeraBoxLeechBot:
                     raise e
         else:
             print("❌ Failed to start polling after multiple retries due to conflicts.")
-            print("💡 Check if another bot instance is running elsewhere :cite[2]")
+            print("💡 Check if another bot instance is running elsewhere")
 
-    async def start_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /start command"""
-        welcome_text = """
-🤖 **TeraBox Leech Bot**
-
-I can download files from TeraBox and send them to you on Telegram!
-
-**Commands:**
-/leech [url] - Download TeraBox file
-/help - Show this help message
-/ping - Check if bot is alive
-
-**Usage:**
-1. Send me a TeraBox link
-2. Or use /leech command
-3. I'll download and send you the file
-
-**Supported domains:** terabox.com, terabox.app, 1024tera.com
-        """
-        await update.message.reply_text(welcome_text)
-    
-    async def help_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /help command"""
-        help_text = """
-📖 **Help Guide**
-
-**How to use:**
-1. Copy any TeraBox share link
-2. Send it to me or use `/leech [link]`
-3. Wait for the download to complete
-
-**Example:**
-`/leech https://terabox.com/s/your-file-link`
-
-**Note:** Large files may take time to download and upload.
-        """
-        await update.message.reply_text(help_text)
-    
-    async def ping_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /ping command"""
-        await update.message.reply_text("🏓 Pong! Bot is alive and running!")
-    
-    async def leech_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /leech command"""
-        if not context.args:
-            await update.message.reply_text(
-                "❌ Please provide a TeraBox link.\n"
-                "**Usage:** `/leech https://terabox.com/s/your-link`"
-            )
-            return
-        
-        terabox_url = context.args[0]
-        await self._process_terabox_request(update, terabox_url)
-    
-    async def message_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle regular messages containing TeraBox links"""
-        message_text = update.message.text
-        
-        # Check if message contains TeraBox link
-        terabox_domains = ['terabox.com', 'terabox.app', '1024tera.com']
-        if any(domain in message_text for domain in terabox_domains):
-            await self._process_terabox_request(update, message_text)
-    
-    async def _process_terabox_request(self, update: Update, terabox_url: str):
-        """Process TeraBox link and initiate download"""
-        status_msg = await update.message.reply_text("🔄 Processing your TeraBox link...")
-        
-        try:
-            # Get direct link from API
-            file_info = self.terabox_api.get_direct_link(terabox_url)
-            
-            if not file_info["success"]:
-                await status_msg.edit_text(f"❌ Failed to process link:\n`{file_info['error']}`")
-                return
-            
-            # Check file size
-            if file_info.get('size', 0) > Config.MAX_FILE_SIZE:
-                await status_msg.edit_text("❌ File is too large (max 2GB supported)")
-                return
-            
-            # Update status with file info
-            size_mb = file_info.get('size', 0) / (1024 * 1024)
-            info_text = (
-                f"📄 **File:** `{file_info['filename']}`\n"
-                f"📦 **Size:** `{size_mb:.2f} MB`\n"
-                f"⏳ **Status:** Starting download..."
-            )
-            await status_msg.edit_text(info_text)
-            
-            # Start download process
-            await download_and_send_file(update, status_msg, file_info)
-            
-        except Exception as e:
-            logger.error(f"Error processing request: {str(e)}")
-            await status_msg.edit_text(f"❌ Error processing request:\n`{str(e)}`")
-    
-    async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle errors in the bot"""
-        logger.error(f"Exception while handling an update: {context.error}")
-        
-        try:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text="❌ An error occurred while processing your request. Please try again."
-            )
-        except:
-            pass
-    
-    def run(self):
-        """Start the bot with safe polling"""
+    async def start_bot(self):
+        """Start the bot with proper async context"""
         logger.info("Starting TeraBox Leech Bot...")
         print("✅ Bot started successfully!")
         print("📍 Press Ctrl+C to stop the bot")
         print("🌐 Health checks available on http://localhost:8000")
         
         # Start the bot with safe polling
-        asyncio.run(self.safe_polling())
+        await self.safe_polling()
 
-if __name__ == "__main__":
+    # ... keep all your existing handler methods unchanged ...
+    # start_handler, help_handler, ping_handler, leech_handler, 
+    # message_handler, _process_terabox_request, error_handler
+
+def main():
+    """Main function to start the bot"""
     print("🚀 Starting TeraBox Leech Bot...")
     try:
         bot = TeraBoxLeechBot()
-        bot.run()
+        # Use asyncio.run() to properly manage the event loop
+        asyncio.run(bot.start_bot())
     except Exception as e:
         print(f"❌ Failed to start bot: {e}")
         print("💡 Check that:")
         print("  1. config.py exists in the project root")
         print("  2. BOT_TOKEN is set in config.py")
         print("  3. All dependencies are installed")
+
+if __name__ == "__main__":
+    main()
