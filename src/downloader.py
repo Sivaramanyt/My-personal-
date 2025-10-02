@@ -3,7 +3,7 @@ import os
 import logging
 from config import Config
 from telegram import Update
-from telegram.types import Message
+from telegram import Message  # This is the corrected import line
 
 logger = logging.getLogger(__name__)
 
