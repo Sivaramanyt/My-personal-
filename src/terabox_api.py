@@ -10,14 +10,14 @@ class TeraBoxAPI:
 
     def get_direct_link(self, terabox_url: str) -> dict:
         """
-        Fetches direct download link from TeraBox API.
-        Returns dict with file info or error message.
+        Fetches the direct download link from the TeraBox API.
+        Returns a dictionary with file info and direct link.
         """
         try:
             payload = {"url": terabox_url}
             headers = {"Content-Type": "application/json"}
             
-            logger.info(f"Fetching direct link for: {terabox_url}")
+            logger.info(f"Requesting direct link for: {terabox_url}")
             response = requests.post(self.api_url, json=payload, headers=headers, timeout=30)
             response.raise_for_status()
             
@@ -34,11 +34,11 @@ class TeraBoxAPI:
                 }
             else:
                 error_msg = data.get("message", "Unknown API error")
-                logger.error(f"API error: {error_msg}")
+                logger.error(f"API returned error: {error_msg}")
                 return {"success": False, "error": error_msg}
                 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Network error: {str(e)}")
+            logger.error(f"Network error occurred: {str(e)}")
             return {"success": False, "error": f"Network error: {str(e)}"}
         except Exception as e:
             logger.error(f"Unexpected error: {str(e)}")
