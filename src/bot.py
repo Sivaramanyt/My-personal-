@@ -5,7 +5,7 @@ import asyncio
 from aiohttp import web
 import threading
 
-# Add the project root directory to Python path
+# DEBUG: Add the project root directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
@@ -118,43 +118,6 @@ class TeraBoxLeechBot:
         # Error handler
         self.app.add_error_handler(self.error_handler)
     
-    async def safe_polling(self):
-        """Start polling with conflict handling and retries."""
-        max_retries = 5
-        retry_delay = 2  # seconds
-
-        for attempt in range(max_retries):
-            try:
-                # Clear any existing webhook first
-                await self.app.bot.delete_webhook(drop_pending_updates=True)
-                print("✅ Webhook deleted, starting polling...")
-                
-                # Start polling - this will run until stopped
-                await self.app.run_polling()
-                break  # Exit loop if polling completes successfully
-
-            except Exception as e:
-                if "Conflict" in str(e):
-                    print(f"❌ Conflict detected (attempt {attempt+1}/{max_retries}). Retrying in {retry_delay}s...")
-                    await asyncio.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
-                else:
-                    print(f"❌ Unexpected error during polling: {e}")
-                    raise e
-        else:
-            print("❌ Failed to start polling after multiple retries due to conflicts.")
-            print("💡 Check if another bot instance is running elsewhere")
-
-    async def start_bot(self):
-        """Start the bot with proper async context"""
-        logger.info("Starting TeraBox Leech Bot...")
-        print("✅ Bot started successfully!")
-        print("📍 Press Ctrl+C to stop the bot")
-        print("🌐 Health checks available on http://localhost:8000")
-        
-        # Start the bot with safe polling
-        await self.safe_polling()
-
     async def start_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
         welcome_text = """
@@ -262,20 +225,23 @@ I can download files from TeraBox and send them to you on Telegram!
             )
         except:
             pass
+    
+    def run(self):
+        """Start the bot"""
+        logger.info("Starting TeraBox Leech Bot...")
+        print("✅ Bot started successfully!")
+        print("📍 Press Ctrl+C to stop the bot")
+        print("🌐 Health checks available on http://localhost:8000")
+        self.app.run_polling()
 
-def main():
-    """Main function to start the bot"""
+if __name__ == "__main__":
     print("🚀 Starting TeraBox Leech Bot...")
     try:
         bot = TeraBoxLeechBot()
-        # Use asyncio.run() to properly manage the event loop
-        asyncio.run(bot.start_bot())
+        bot.run()
     except Exception as e:
         print(f"❌ Failed to start bot: {e}")
         print("💡 Check that:")
         print("  1. config.py exists in the project root")
         print("  2. BOT_TOKEN is set in config.py")
         print("  3. All dependencies are installed")
-
-if __name__ == "__main__":
-    main()
