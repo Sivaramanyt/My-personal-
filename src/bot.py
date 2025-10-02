@@ -1,6 +1,9 @@
 import sys
 import os
 import logging
+import asyncio
+from aiohttp import web
+import threading
 
 # DEBUG: Add the project root directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -38,9 +41,43 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 logger = logging.getLogger(__name__)
 
+class HealthServer:
+    """Simple HTTP server for health checks"""
+    def __init__(self, port=8000):
+        self.port = port
+        self.app = web.Application()
+        self.setup_routes()
+        
+    def setup_routes(self):
+        """Setup health check routes"""
+        self.app.router.add_get('/', self.health_check)
+        self.app.router.add_get('/health', self.health_check)
+        
+    async def health_check(self, request):
+        """Handle health check requests"""
+        return web.Response(text="OK", status=200)
+    
+    def start(self):
+        """Start the health server in a separate thread"""
+        def run_server():
+            try:
+                web.run_app(self.app, host='0.0.0.0', port=self.port, access_log=None, print=None)
+            except Exception as e:
+                print(f"❌ Health server error: {e}")
+        
+        # Start the server in a daemon thread
+        server_thread = threading.Thread(target=run_server)
+        server_thread.daemon = True
+        server_thread.start()
+        print(f"✅ Health check server started on port {self.port}")
+
 class TeraBoxLeechBot:
     def __init__(self):
         print("🔧 Initializing TeraBoxLeechBot...")
+        
+        # Start health check server first
+        self.health_server = HealthServer()
+        self.health_server.start()
         
         # Check if BOT_TOKEN is set
         if Config.BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
@@ -179,6 +216,7 @@ I can download files from TeraBox and send them to you on Telegram!
         logger.info("Starting TeraBox Leech Bot...")
         print("✅ Bot started successfully!")
         print("📍 Press Ctrl+C to stop the bot")
+        print("🌐 Health checks available on http://localhost:8000")
         self.app.run_polling()
 
 if __name__ == "__main__":
