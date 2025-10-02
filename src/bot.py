@@ -1,22 +1,57 @@
-import logging
+import sys
 import os
+import logging
+
+# DEBUG: Add the project root directory to Python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
+
+print(f"🔍 DEBUG: Current directory: {current_dir}")
+print(f"🔍 DEBUG: Parent directory: {parent_dir}")
+print(f"🔍 DEBUG: Python path: {sys.path}")
+
+try:
+    from config import Config
+    print("✅ SUCCESS: Imported Config from config")
+except ImportError as e:
+    print(f"❌ ERROR: Failed to import Config: {e}")
+    print("💡 TIP: Make sure config.py exists in the project root directory")
+    raise
+
+try:
+    from src.terabox_api import TeraBoxAPI
+    print("✅ SUCCESS: Imported TeraBoxAPI")
+except ImportError as e:
+    print(f"❌ ERROR: Failed to import TeraBoxAPI: {e}")
+    raise
+
+try:
+    from src.downloader import download_and_send_file
+    print("✅ SUCCESS: Imported download_and_send_file")
+except ImportError as e:
+    print(f"❌ ERROR: Failed to import download_and_send_file: {e}")
+    raise
+
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from config import Config
-from src.terabox_api import TeraBoxAPI
-from src.downloader import download_and_send_file
 
 logger = logging.getLogger(__name__)
 
 class TeraBoxLeechBot:
     def __init__(self):
-        self.token = Config.BOT_TOKEN
-        if self.token == "YOUR_BOT_TOKEN_HERE":
-            raise ValueError("❌ Please set your BOT_TOKEN in config.py")
+        print("🔧 Initializing TeraBoxLeechBot...")
         
+        # Check if BOT_TOKEN is set
+        if Config.BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
+            raise ValueError("❌ Please set your BOT_TOKEN in config.py - get it from @BotFather on Telegram")
+        
+        print("✅ BOT_TOKEN is configured")
+        self.token = Config.BOT_TOKEN
         self.app = Application.builder().token(self.token).build()
         self.terabox_api = TeraBoxAPI()
         self._setup_handlers()
+        print("✅ Bot handlers setup completed")
     
     def _setup_handlers(self):
         """Setup all command and message handlers"""
@@ -145,3 +180,15 @@ I can download files from TeraBox and send them to you on Telegram!
         print("✅ Bot started successfully!")
         print("📍 Press Ctrl+C to stop the bot")
         self.app.run_polling()
+
+if __name__ == "__main__":
+    print("🚀 Starting TeraBox Leech Bot...")
+    try:
+        bot = TeraBoxLeechBot()
+        bot.run()
+    except Exception as e:
+        print(f"❌ Failed to start bot: {e}")
+        print("💡 Check that:")
+        print("  1. config.py exists in the project root")
+        print("  2. BOT_TOKEN is set in config.py")
+        print("  3. All dependencies are installed")
