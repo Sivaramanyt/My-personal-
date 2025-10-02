@@ -2,10 +2,11 @@ import sys
 import os
 import logging
 import asyncio
+import time
 from aiohttp import web
 import threading
 
-# DEBUG: Add the project root directory to Python path
+# Add the project root directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
@@ -118,6 +119,33 @@ class TeraBoxLeechBot:
         # Error handler
         self.app.add_error_handler(self.error_handler)
     
+    async def safe_polling(self):
+        """Start polling with conflict handling and retries :cite[10]."""
+        max_retries = 5
+        retry_delay = 2  # seconds
+
+        for attempt in range(max_retries):
+            try:
+                # Clear any existing webhook first to prevent conflicts :cite[6]:cite[10]
+                await self.app.bot.delete_webhook(drop_pending_updates=True)
+                print("✅ Webhook deleted, starting polling...")
+                
+                # Start polling
+                await self.app.run_polling()
+                break  # Exit loop if polling starts successfully
+
+            except Exception as e:
+                if "Conflict" in str(e):
+                    print(f"❌ Conflict detected (attempt {attempt+1}/{max_retries}). Retrying in {retry_delay}s...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    print(f"❌ Unexpected error during polling: {e}")
+                    raise e
+        else:
+            print("❌ Failed to start polling after multiple retries due to conflicts.")
+            print("💡 Check if another bot instance is running elsewhere :cite[2]")
+
     async def start_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
         welcome_text = """
@@ -227,12 +255,14 @@ I can download files from TeraBox and send them to you on Telegram!
             pass
     
     def run(self):
-        """Start the bot"""
+        """Start the bot with safe polling"""
         logger.info("Starting TeraBox Leech Bot...")
         print("✅ Bot started successfully!")
         print("📍 Press Ctrl+C to stop the bot")
         print("🌐 Health checks available on http://localhost:8000")
-        self.app.run_polling()
+        
+        # Start the bot with safe polling
+        asyncio.run(self.safe_polling())
 
 if __name__ == "__main__":
     print("🚀 Starting TeraBox Leech Bot...")
