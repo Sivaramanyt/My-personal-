@@ -1,5 +1,6 @@
 import requests
 import logging
+import re
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -23,14 +24,27 @@ class TeraBoxAPI:
             
             data = response.json()
             
-            if data.get("success"):
-                file_info = data["data"]
-                logger.info(f"Successfully retrieved link for: {file_info.get('filename', 'N/A')}")
+            # Debug: Print the actual API response structure
+            print(f"🔍 DEBUG: API Response: {data}")
+            
+            # Parse the actual API response structure
+            if "✅ Status" in data and data["✅ Status"] == "Success":
+                extracted_info = data["📚 Extracted Info"][0]  # Get first file info
+                
+                filename = extracted_info.get("📁 Title", "Unnamed_File")
+                size_str = extracted_info.get("📊 Size", "0 MB")
+                direct_link = extracted_info.get("🔗 Direct Download Link", "")
+                
+                # Convert size string (like "20.29 MB") to bytes
+                size_bytes = self._convert_size_to_bytes(size_str)
+                
+                logger.info(f"Successfully retrieved link for: {filename}")
                 return {
                     "success": True,
-                    "filename": file_info.get("filename", "Unnamed_File"),
-                    "direct_link": file_info.get("link"),
-                    "size": file_info.get("size", 0)
+                    "filename": filename,
+                    "direct_link": direct_link,
+                    "size": size_bytes,
+                    "size_str": size_str  # Keep original string for display
                 }
             else:
                 error_msg = data.get("message", "Unknown API error")
@@ -43,3 +57,24 @@ class TeraBoxAPI:
         except Exception as e:
             logger.error(f"Unexpected error: {str(e)}")
             return {"success": False, "error": f"Unexpected error: {str(e)}"}
+
+    def _convert_size_to_bytes(self, size_str: str) -> int:
+        """
+        Convert size string like "20.29 MB" to bytes
+        """
+        try:
+            # Extract number and unit
+            match = re.match(r"([\d.]+)\s*([KMGTP]?B)", size_str.upper())
+            if not match:
+                return 0
+                
+            size_value = float(match.group(1))
+            unit = match.group(2)
+            
+            # Convert to bytes
+            units = {"B": 1, "KB": 1024, "MB": 1024**2, "GB": 1024**3, "TB": 1024**4}
+            return int(size_value * units.get(unit, 1))
+            
+        except Exception as e:
+            logger.warning(f"Could not parse size string '{size_str}': {e}")
+            return 0
